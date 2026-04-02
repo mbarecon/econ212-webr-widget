@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ECON 212 webR Wid([github.com](https://github.com/mbarecon/webr-widget))    --bg: #f6f8fb;
+  <title>ECON 2([docs.r-wasm.org](https://docs.r-wasm.org/webr/latest/plotting.html))tyle>
+    :root {
+      --bg: #f6f8fb;
       --panel: #ffffff;
       --text: #1f2937;
       --muted: #6b7280;
       --border: #dbe3ee;
       --accent: #2563eb;
       --accent-dark: #1d4ed8;
-      --success: #0f766e;
-      --danger: #b91c1c;
       --editor-bg: #0f172a;
       --editor-text: #e5e7eb;
       --console-bg: #111827;
@@ -34,30 +34,18 @@
       padding: 24px;
     }
 
-    .hero {
-      margin-bottom: 20px;
-    }
-
     h1 {
       margin: 0 0 8px;
       font-size: 2rem;
     }
 
     .subtitle {
-      margin: 0;
+      margin: 0 0 18px;
       color: var(--muted);
       max-width: 760px;
     }
 
-    .status-bar {
-      margin-top: 16px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .status-pill {
+    .status {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -65,21 +53,21 @@
       border-radius: 999px;
       background: #eef2ff;
       color: #3730a3;
-      font-size: 0.95rem;
       border: 1px solid #c7d2fe;
+      font-size: 0.95rem;
+      margin-bottom: 18px;
     }
 
-    .status-dot {
+    .dot {
       width: 10px;
       height: 10px;
       border-radius: 50%;
       background: #f59e0b;
-      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
     }
 
-    .status-dot.ready { background: #10b981; }
-    .status-dot.error { background: #ef4444; }
-    .status-dot.running { background: #2563eb; }
+    .dot.ready { background: #10b981; }
+    .dot.error { background: #ef4444; }
+    .dot.running { background: #2563eb; }
 
     .layout {
       display: grid;
@@ -97,18 +85,10 @@
     }
 
     .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
       padding: 16px 18px;
       border-bottom: 1px solid var(--border);
       background: #fafcff;
-    }
-
-    .panel-header h2 {
-      margin: 0;
-      font-size: 1.05rem;
+      font-weight: 700;
     }
 
     .panel-body {
@@ -203,8 +183,10 @@
     #plot {
       min-height: 260px;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: flex-start;
       border: 1px dashed var(--border);
       border-radius: 16px;
       background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -212,23 +194,18 @@
       overflow: auto;
     }
 
-    #plot canvas,
-    #plot img,
-    #plot svg {
+    #plot canvas {
       max-width: 100%;
       height: auto;
+      border-radius: 8px;
+      background: white;
     }
 
     .empty-state {
       color: var(--muted);
       text-align: center;
       padding: 24px;
-    }
-
-    .footer-note {
-      margin-top: 18px;
-      color: var(--muted);
-      font-size: 0.9rem;
+      width: 100%;
     }
 
     @media (max-width: 900px) {
@@ -244,24 +221,16 @@
 </head>
 <body>
   <div class="container">
-    <section class="hero">
-      <h1>R Practice</h1>
-      <p class="subtitle">
-        Write R code and run it directly in your browser with webR. This widget is designed for quick ECON 212 practice, including console output and basic plots.
-      </p>
-      <div class="status-bar">
-        <div class="status-pill">
-          <span id="statusDot" class="status-dot"></span>
-          <span id="statusText">Loading webR...</span>
-        </div>
-      </div>
-    </section>
+    <h1>R Practice</h1>
+    <p class="subtitle">Write R code and run it directly in your browser with webR.</p>
+    <div class="status">
+      <span id="statusDot" class="dot"></span>
+      <span id="statusText">Loading webR...</span>
+    </div>
 
     <main class="layout">
       <section class="panel">
-        <div class="panel-header">
-          <h2>Editor</h2>
-        </div>
+        <div class="panel-header">Editor</div>
         <div class="panel-body">
           <div class="controls">
             <button id="runBtn" class="primary" disabled>Run Code</button>
@@ -275,18 +244,14 @@
 
       <section class="output-grid">
         <section class="panel">
-          <div class="panel-header">
-            <h2>Console</h2>
-          </div>
+          <div class="panel-header">Console</div>
           <div class="panel-body">
-            <pre id="console">webR is starting…</pre>
+            <pre id="console">Loading webR, please wait...</pre>
           </div>
         </section>
 
         <section class="panel">
-          <div class="panel-header">
-            <h2>Plot</h2>
-          </div>
+          <div class="panel-header">Plot</div>
           <div class="panel-body">
             <div id="plot">
               <div class="empty-state">Run code that creates a plot to display it here.</div>
@@ -295,14 +260,18 @@
         </section>
       </section>
     </main>
-
-    <p class="footer-note">
-      If you want stable deployments, pin a specific webR version instead of <code>latest</code> in the module URL.
-    </p>
   </div>
 
   <script type="module">
-    const starterCode = `# Basic summary statistics\nvalues <- c(12, 15, 14, 17, 19, 21, 18, 16)\n\nmean(values)\nsd(values)\n\n# Make a simple plot\nplot(values, type = \"b\", pch = 19, col = \"steelblue\",\n     main = \"Sample Data\", ylab = \"Value\", xlab = \"Observation\")`;
+    const starterCode = `# Basic summary statistics
+values <- c(12, 15, 14, 17, 19, 21, 18, 16)
+
+mean(values)
+sd(values)
+
+plot(values, type = "b", pch = 19,
+     main = "Sample Data",
+     ylab = "Value", xlab = "Observation")`;
 
     const editor = document.getElementById('editor');
     const consoleEl = document.getElementById('console');
@@ -315,100 +284,110 @@
 
     editor.value = starterCode;
 
-    let webR;
-    let shelter;
+    let webR = null;
     let running = false;
 
-    function setStatus(message, state = 'idle') {
+    function setStatus(message, state = '') {
       statusText.textContent = message;
-      statusDot.className = `status-dot ${state}`.trim();
+      statusDot.className = `dot ${state}`.trim();
     }
 
-    function appendConsole(message) {
-      if (!message) return;
-      consoleEl.textContent += `${consoleEl.textContent ? '\n' : ''}${message}`;
-      consoleEl.scrollTop = consoleEl.scrollHeight;
+    function setButtons(enabled) {
+      runBtn.disabled = !enabled || running;
+      resetBtn.disabled = !enabled || running;
+      clearBtn.disabled = !enabled || running;
     }
 
     function clearPlot() {
       plotEl.innerHTML = '<div class="empty-state">Run code that creates a plot to display it here.</div>';
     }
 
-    function enableControls(enabled) {
-      runBtn.disabled = !enabled || running;
-      resetBtn.disabled = !enabled || running;
-      clearBtn.disabled = !enabled || running;
+    function clearConsole() {
+      consoleEl.textContent = '';
     }
 
-    function setRunning(isRunning) {
-      running = isRunning;
-      if (isRunning) {
-        setStatus('Running R code...', 'running');
+    function renderOutput(output) {
+      if (!output || output.length === 0) {
+        consoleEl.textContent = '[No console output]';
+        return;
       }
-      enableControls(!!webR);
+
+      consoleEl.textContent = output
+        .map(item => {
+          if (typeof item.data === 'string') return item.data;
+          return `[${item.type}]`;
+        })
+        .join('\n');
+    }
+
+    function renderImages(images) {
+      plotEl.innerHTML = '';
+
+      if (!images || images.length === 0) {
+        clearPlot();
+        return;
+      }
+
+      images.forEach((img) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        plotEl.appendChild(canvas);
+      });
     }
 
     async function initWebR() {
       try {
         setStatus('Loading webR...', 'running');
-        consoleEl.textContent = 'Loading webR…';
 
         const { WebR } = await import('https://webr.r-wasm.org/latest/webr.mjs');
-        webR = new WebR({
-          stdout: line => appendConsole(line),
-          stderr: line => appendConsole(line),
-        });
-
+        webR = new WebR();
         await webR.init();
-        shelter = await new webR.Shelter();
 
         setStatus('webR is ready', 'ready');
         consoleEl.textContent = 'webR is ready. Click Run Code to begin.';
-        enableControls(true);
+        setButtons(true);
       } catch (error) {
-        consoleEl.textContent = `Failed to load webR.\n\n${error?.message || error}`;
         setStatus('webR failed to load', 'error');
+        consoleEl.textContent = `Failed to load webR.\n\n${error?.message || error}`;
       }
     }
 
     async function runCode() {
       if (!webR || running) return;
 
-      setRunning(true);
-      consoleEl.textContent = '';
+      running = true;
+      setButtons(true);
+      setStatus('Running R code...', 'running');
+      clearConsole();
       clearPlot();
 
+      let shelter = null;
+
       try {
-        // Open a graphics device that renders into the page.
-        await webR.evalRVoid(`grDevices::png(filename = "webr-plot.png", width = 900, height = 600)`);
-        await shelter.captureR(editor.value, {
-          withAutoprint: true,
+        shelter = await new webR.Shelter();
+        const capture = await shelter.captureR(editor.value, {
+          captureGraphics: {
+            width: 504,
+            height: 504,
+            bg: 'white'
+          }
         });
-        await webR.evalRVoid('grDevices::dev.off()');
 
-        const plotFile = await webR.FS.readFile('/home/web_user/webr-plot.png');
-        if (plotFile && plotFile.length > 0) {
-          const blob = new Blob([plotFile], { type: 'image/png' });
-          const url = URL.createObjectURL(blob);
-          plotEl.innerHTML = '';
-          const img = document.createElement('img');
-          img.src = url;
-          img.alt = 'R plot output';
-          plotEl.appendChild(img);
-        } else {
-          clearPlot();
-        }
-
-        if (!consoleEl.textContent.trim()) {
-          consoleEl.textContent = '[No console output]';
-        }
-
+        renderOutput(capture.output);
+        renderImages(capture.images);
         setStatus('webR is ready', 'ready');
       } catch (error) {
-        appendConsole(`\nError: ${error?.message || error}`);
         setStatus('Code execution failed', 'error');
+        consoleEl.textContent = `Error: ${error?.message || error}`;
       } finally {
-        setRunning(false);
+        if (shelter) {
+          shelter.purge();
+        }
+        running = false;
+        setButtons(true);
       }
     }
 
@@ -416,11 +395,11 @@
 
     resetBtn.addEventListener('click', () => {
       editor.value = starterCode;
-      setStatus(webR ? 'webR is ready' : 'Loading webR...', webR ? 'ready' : 'running');
+      if (webR) setStatus('webR is ready', 'ready');
     });
 
     clearBtn.addEventListener('click', () => {
-      consoleEl.textContent = '';
+      clearConsole();
       clearPlot();
       if (webR) setStatus('webR is ready', 'ready');
     });
