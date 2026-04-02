@@ -122,6 +122,12 @@
       background: rgba(255,255,255,0.06);
     }
 
+    .btn-small {
+      padding: 7px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
     .workspace {
       display: grid;
       grid-template-columns: minmax(300px, 1.05fr) minmax(320px, 0.95fr);
@@ -276,16 +282,46 @@
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 12px;
       padding: 12px;
+      overflow: hidden;
+    }
+
+    .plot-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .plot-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .plot-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .plot-frame {
+      background: rgba(255,255,255,0.02);
+      border-radius: 10px;
+      padding: 10px;
       overflow: auto;
     }
 
-    .plot-card canvas {
+    .plot-img {
       display: block;
       max-width: 100%;
       height: auto;
       background: var(--plot-bg);
       border-radius: 8px;
       margin: 0 auto;
+      user-select: none;
+      -webkit-user-drag: auto;
     }
 
     .empty-state {
@@ -393,7 +429,7 @@
           <button class="tab-btn active" data-tab="console">Console</button>
           <button class="tab-btn" data-tab="plots">Plots</button>
         </div>
-        <div class="hint">Output updates after each run</div>
+        <div class="hint">Copy or download figures from the Plots tab</div>
       </div>
       <div class="right-content">
         <div id="consolePanel" class="tab-panel active">
@@ -420,6 +456,7 @@
     let editor = null;
     let ready = false;
     let running = false;
+    let plotUrls = [];
 
     const starterCode = `# Example code
 x <- rnorm(1000)
@@ -470,7 +507,13 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
       consoleEl.replaceChildren();
     }
 
+    function revokePlotUrls() {
+      for (const url of plotUrls) URL.revokeObjectURL(url);
+      plotUrls = [];
+    }
+
     function clearPlots() {
+      revokePlotUrls();
       plotStack.replaceChildren();
       plotStack.appendChild(plotEmpty);
     }
@@ -491,48 +534,120 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
       document.getElementById('plotsPanel').classList.toggle('active', name === 'plots');
     }
 
-    function showPlots(images) {
-      plotStack.replaceChildren();
-      if (!images || images.length === 0) {
-        plotStack.appendChild(plotEmpty);
-        return;
-      }
-
-      images.forEach((img) => {
-        const card = document.createElement('div');
-        card.className = 'plot-card';
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-        card.appendChild(canvas);
-        plotStack.appendChild(card);
+    function canvasToBlob(canvas) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert canvas to PNG.'));
+        }, 'image/png');
       });
     }
 
-    async function drawFlushedCanvasMessages() {
-      const flushed = await webR.flush();
-      const images = [];
-      flushed.forEach(msg => {
-        if (msg.type === 'canvas' && msg.data && msg.data.event === 'canvasImage') {
-          images.push(msg.data.image);
+    async function imageBitmapToBlob(imageBitmap) {
+      const canvas = document.createElement('canvas');
+      canvas.width = imageBitmap.width;
+      canvas.height = imageBitmap.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imageBitmap, 0, 0);
+      const blob = await canvasToBlob(canvas);
+      if (typeof imageBitmap.close === 'function') imageBitmap.close();
+      return blob;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function copyBlobToClipboard(blob) {
+      if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+        throw new Error('Clipboard image copy is not supported in this browser.');
+      }
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+    }
+
+    function makePlotCard(blob, index) {
+      const url = URL.createObjectURL(blob);
+      plotUrls.push(url);
+
+      const card = document.createElement('div');
+      card.className = 'plot-card';
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'plot-toolbar';
+
+      const label = document.createElement('div');
+      label.className = 'plot-label';
+      label.textContent = `Plot ${index + 1} · PNG`;
+
+      const actions = document.createElement('div');
+      actions.className = 'plot-actions';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn-secondary btn-small';
+      copyBtn.textContent = 'Copy PNG';
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await copyBlobToClipboard(blob);
+          runMeta.textContent = `Copied plot ${index + 1}`;
+        } catch (err) {
+          appendConsole(`Copy failed: ${err.message}`, 'warning');
+          runMeta.textContent = 'Copy failed';
         }
       });
-      if (images.length > 0) {
-        plotStack.replaceChildren();
-        images.forEach((img) => {
-          const card = document.createElement('div');
-          card.className = 'plot-card';
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          card.appendChild(canvas);
-          plotStack.appendChild(card);
-        });
-        activateTab('plots');
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'btn-secondary btn-small';
+      downloadBtn.textContent = 'Download PNG';
+      downloadBtn.addEventListener('click', () => {
+        downloadBlob(blob, `webr-plot-${index + 1}.png`);
+        runMeta.textContent = `Downloaded plot ${index + 1}`;
+      });
+
+      const openBtn = document.createElement('button');
+      openBtn.className = 'btn-secondary btn-small';
+      openBtn.textContent = 'Open';
+      openBtn.addEventListener('click', () => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      });
+
+      actions.append(copyBtn, downloadBtn, openBtn);
+      toolbar.append(label, actions);
+
+      const frame = document.createElement('div');
+      frame.className = 'plot-frame';
+
+      const img = document.createElement('img');
+      img.className = 'plot-img';
+      img.src = url;
+      img.alt = `Generated plot ${index + 1}`;
+      img.loading = 'lazy';
+
+      frame.appendChild(img);
+      card.append(toolbar, frame);
+      return card;
+    }
+
+    async function renderPlotsFromBitmaps(bitmaps) {
+      plotStack.replaceChildren();
+      if (!bitmaps || bitmaps.length === 0) {
+        plotStack.appendChild(plotEmpty);
+        return 0;
       }
+
+      for (let i = 0; i < bitmaps.length; i++) {
+        const blob = await imageBitmapToBlob(bitmaps[i]);
+        plotStack.appendChild(makePlotCard(blob, i));
+      }
+      return bitmaps.length;
     }
 
     async function initWebR() {
@@ -591,27 +706,24 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
           }
         }
 
-        if (capture.images && capture.images.length > 0) {
-          showPlots(capture.images);
+        const plotCount = await renderPlotsFromBitmaps(capture.images || []);
+        if (plotCount > 0) {
           activateTab('plots');
+          runMeta.textContent = `Done · ${plotCount} plot${plotCount === 1 ? '' : 's'}`;
         } else {
-          await drawFlushedCanvasMessages();
+          runMeta.textContent = 'Done';
         }
 
-        const plotCount = document.querySelectorAll('.plot-card').length;
-        runMeta.textContent = plotCount > 0 ? `Done · ${plotCount} plot${plotCount === 1 ? '' : 's'}` : 'Done';
         setStatus('webR ready', 'ready');
       } catch (err) {
         appendConsole(`Error: ${err.message}`, 'error');
         runMeta.textContent = 'Error';
         setStatus('Execution error', 'error');
       } finally {
-        if (shelter) shelter.purge();
+        if (shelter) await shelter.purge();
         running = false;
         runBtn.disabled = !ready;
-        if (ready && statusText.textContent === 'Execution error') {
-          // keep error status until next successful run
-        } else if (ready) {
+        if (ready && statusText.textContent !== 'Execution error') {
           setStatus('webR ready', 'ready');
         }
       }
