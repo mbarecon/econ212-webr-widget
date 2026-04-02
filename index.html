@@ -2,120 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebR Custom Widget</title>
-    
-    <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/r/r.min.js"></script>
-
+    <title>My WebR Interface</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-bottom: 15px; padding-bottom: 10px; }
-        #status { font-size: 0.9em; padding: 4px 10px; border-radius: 4px; }
-        .loading { background: #ffeeba; color: #856404; }
-        .ready { background: #d4edda; color: #155724; }
-        
-        /* Editor and Output Styling */
-        .CodeMirror { height: 200px; border-radius: 4px; font-size: 14px; }
-        .controls { margin: 15px 0; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:disabled { background: #ccc; }
-        button:hover:not(:disabled) { background: #0056b3; }
-        
-        #output-console { background: #282a36; color: #f8f8f2; padding: 15px; border-radius: 4px; font-family: monospace; min-height: 50px; white-space: pre-wrap; margin-top: 10px; }
-        #canvas-container { margin-top: 20px; text-align: center; border: 1px dashed #ccc; padding: 10px; background: #fafafa; }
-        canvas { max-width: 100%; height: auto; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+        iframe { width: 100%; height: 100vh; border: none; }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="header">
-        <h2>R WebR Widget</h2>
-        <span id="status" class="loading">Loading R...</span>
-    </div>
-
-    <textarea id="code-editor"># Write R code here
-print("Hello from WebR!")
-
-# Try a plot:
-x <- seq(0, 2*pi, length.out = 100)
-plot(x, sin(x), type = "l", col = "blue", lwd = 2, main = "Sine Wave")</textarea>
-
-    <div class="controls">
-        <button id="run-btn" disabled>Run Code</button>
-    </div>
-
-    <div id="output-console">System: Initializing Web Assembly...</div>
-
-    <div id="canvas-container">
-        <canvas id="canvas" width="1008" height="1008"></canvas>
-    </div>
-</div>
-
-<script type="module">
-    import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
-
-    // Initialize Editor
-    const editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
-        mode: "r",
-        theme: "dracula",
-        lineNumbers: true
-    });
-
-    const runBtn = document.getElementById('run-btn');
-    const outputConsole = document.getElementById('output-console');
-    const status = document.getElementById('status');
-    const canvas = document.getElementById('canvas');
-
-    async function init() {
-        const webR = new WebR();
-        await webR.init();
-        
-        status.innerText = "R Ready";
-        status.className = "ready";
-        runBtn.disabled = false;
-        outputConsole.innerText = "Console: Ready for input.";
-
-        runBtn.onclick = async () => {
-            runBtn.disabled = true;
-            outputConsole.innerText = "Running...";
-            
-            // Set up graphics device
-            await webR.evalR("options(device = webr::canvas)");
-            
-            try {
-                // Execute code from editor
-                const shelter = await new webR.Shelter();
-                const result = await shelter.evalR(editor.getValue());
-                const output = await result.toJs();
-                
-                // Display output
-                outputConsole.innerText = output.values ? output.values.join('\n') : "Code executed successfully.";
-                
-                // Capture any plots
-                const msgs = await webR.flush();
-                msgs.forEach(msg => {
-                    if (msg.type === 'canvas' && msg.data.event === 'drawCanvas') {
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(msg.data.image, 0, 0);
-                    }
-                });
-            } catch (err) {
-                outputConsole.innerText = "Error: " + err.message;
-            } finally {
-                runBtn.disabled = false;
-            }
-        };
-    }
-
-    init();
-</script>
-
+    <iframe src="https://webr.r-wasm.org/latest/"></iframe>
 </body>
 </html>
