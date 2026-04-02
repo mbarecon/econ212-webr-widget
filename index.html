@@ -3,145 +3,224 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebR Widget</title>
+  <title>webR Widget</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/eclipse.min.css">
+
   <style>
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      max-width: 900px;
-      margin: 40px auto;
+      max-width: 980px;
+      margin: 32px auto;
       padding: 0 16px;
       line-height: 1.4;
     }
-    textarea {
-      width: 100%;
-      height: 260px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 14px;
-      padding: 12px;
-      box-sizing: border-box;
+
+    h1, h2 {
+      margin-bottom: 0.4rem;
     }
+
+    .muted {
+      color: #666;
+    }
+
+    .controls {
+      margin: 12px 0 18px;
+    }
+
     button {
       padding: 10px 14px;
-      margin: 10px 10px 10px 0;
+      margin-right: 10px;
       cursor: pointer;
     }
+
+    .CodeMirror {
+      border: 1px solid #ccc;
+      height: 320px;
+      font-size: 14px;
+    }
+
     pre {
       background: #111;
       color: #eee;
       padding: 12px;
-      min-height: 120px;
+      min-height: 140px;
       white-space: pre-wrap;
+      overflow-x: auto;
     }
+
+    #plots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
     #plots canvas {
       max-width: 100%;
       height: auto;
-      display: block;
-      margin: 12px 0;
       border: 1px solid #ddd;
-    }
-    .muted {
-      color: #666;
+      background: white;
+      display: block;
     }
   </style>
 </head>
 <body>
-  <h1>WebR Widget</h1>
+  <h1>webR Widget</h1>
   <p class="muted">Run R code directly in the browser.</p>
 
-  <textarea id="code">x <- c(12, 15, 14, 17, 19, 21, 18, 16)
+  <textarea id="code-editor">
+x <- c(12, 15, 14, 17, 19, 21, 18, 16)
 
 mean(x)
 sd(x)
 
-plot(x, type = "b", pch = 19, main = "Sample Plot")</textarea>
+plot(x, type = "b", pch = 19, col = "steelblue", main = "Sample Plot")
+  </textarea>
 
-  <div>
+  <div class="controls">
     <button id="run">Run Code</button>
     <button id="clear">Clear Output</button>
+    <span id="status" class="muted">Loading webR...</span>
   </div>
 
   <h2>Console</h2>
-  <pre id="output">Loading webR...</pre>
+  <pre id="output"></pre>
 
   <h2>Plots</h2>
   <div id="plots"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/r/r.min.js"></script>
+
   <script type="module">
     import { WebR, ChannelType } from "https://webr.r-wasm.org/latest/webr.mjs";
 
-    const output = document.getElementById("output");
-    const plots = document.getElementById("plots");
-    const codeBox = document.getElementById("code");
+    const outputEl = document.getElementById("output");
+    const plotsEl = document.getElementById("plots");
     const runBtn = document.getElementById("run");
     const clearBtn = document.getElementById("clear");
+    const statusEl = document.getElementById("status");
 
-    let webR;
+    const editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+      mode: "r",
+      theme: "eclipse",
+      lineNumbers: true,
+      indentUnit: 2,
+      tabSize: 2
+    });
 
-    function setOutput(text) {
-      output.textContent = text;
+    let webR = null;
+    let isRunning = false;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function clearConsole() {
+      outputEl.textContent = "";
     }
 
     function clearPlots() {
-      plots.innerHTML = "";
+      plotsEl.innerHTML = "";
+    }
+
+    function clearAll() {
+      clearConsole();
+      clearPlots();
+    }
+
+    function renderConsole(items) {
+      if (!items || items.length === 0) {
+        outputEl.textContent = "[No console output]";
+        return;
+      }
+
+      const lines = items.map((item) => {
+        if (typeof item.data === "string") return item.data;
+        if (item.type === "warning") return "[warning]";
+        if (item.type === "message") return "[message]";
+        if (item.type === "error") return "[error]";
+        return `[${item.type}]`;
+      });
+
+      outputEl.textContent = lines.join("\n");
+    }
+
+    function renderPlots(images) {
+      clearPlots();
+
+      if (!images || images.length === 0) return;
+
+      images.forEach((img) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        plotsEl.appendChild(canvas);
+      });
     }
 
     async function init() {
+      runBtn.disabled = true;
+
       try {
         webR = new WebR({
           channelType: ChannelType.PostMessage
         });
+
         await webR.init();
-        setOutput("webR ready.");
+        setStatus("webR ready.");
+        clearConsole();
         runBtn.disabled = false;
       } catch (err) {
-        setOutput("Failed to load webR:\n\n" + err);
+        setStatus("webR failed to load.");
+        outputEl.textContent = "Failed to load webR:\n\n" + String(err);
       }
     }
 
     async function runCode() {
-      runBtn.disabled = true;
-      setOutput("Running...");
-      clearPlots();
+      if (!webR || isRunning) return;
 
-      let shelter;
+      isRunning = true;
+      runBtn.disabled = true;
+      setStatus("Running...");
+
+      clearAll();
+
+      let shelter = null;
+
       try {
         shelter = await new webR.Shelter();
 
-        const result = await shelter.captureR(codeBox.value, {
+        const capture = await shelter.captureR(editor.getValue(), {
+          withAutoprint: true,
           captureGraphics: {
             width: 700,
             height: 500,
             bg: "white"
-          },
-          withAutoprint: true
+          }
         });
 
-        const text = result.output
-          .map(item => typeof item.data === "string" ? item.data : `[${item.type}]`)
-          .join("\n");
-
-        setOutput(text || "[No console output]");
-
-        for (const img of result.images) {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext("2d").drawImage(img, 0, 0);
-          plots.appendChild(canvas);
-        }
+        renderConsole(capture.output);
+        renderPlots(capture.images);
+        setStatus("Done.");
       } catch (err) {
-        setOutput("Execution error:\n\n" + err);
+        outputEl.textContent = "Execution error:\n\n" + String(err);
+        setStatus("Run failed.");
       } finally {
         if (shelter) shelter.purge();
+        isRunning = false;
         runBtn.disabled = false;
       }
     }
 
-    runBtn.disabled = true;
     runBtn.addEventListener("click", runCode);
+
     clearBtn.addEventListener("click", () => {
-      setOutput("");
-      clearPlots();
+      clearAll();
+      setStatus(webR ? "Cleared." : "Loading webR...");
     });
 
     init();
