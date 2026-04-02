@@ -1,33 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>WebR Widget</title>
-  <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebR Widget</title>
+    <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
+    
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
+        #status-box { padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .loading { background: #fff3cd; color: #856404; }
+        .ready { background: #d4edda; color: #155724; }
+        #output { background: #f8f9fa; padding: 15px; border: 1px solid #ddd; white-space: pre-wrap; font-family: monospace; }
+    </style>
 </head>
 <body>
-  <h1>WebR Status: <span id="status">Loading...</span></h1>
-  <div id="output"></div>
 
-  <script type="module">
-    import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
+    <h2>WebR Widget</h2>
     
-    async function initWebR() {
-      const status = document.getElementById('status');
-      try {
-        const webR = new WebR();
-        await webR.init();
-        status.innerText = "Ready! ✅";
-        
-        // Test execution
-        const result = await webR.evalR('R.version.string');
-        document.getElementById('output').innerText = await result.toJs();
-      } catch (e) {
-        status.innerText = "Error ❌";
-        console.error(e);
-      }
-    }
+    <div id="status-box" class="loading">
+        Status: <span id="status">Initializing WebR (this may take a few seconds)...</span>
+    </div>
 
-    initWebR();
-  </script>
+    <h3>R Output:</h3>
+    <div id="output">Waiting for execution...</div>
+
+    <script type="module">
+        // 2. Import WebR from the official CDN
+        import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
+
+        async function startWebR() {
+            const statusText = document.getElementById('status');
+            const statusBox = document.getElementById('status-box');
+            const outputDiv = document.getElementById('output');
+
+            try {
+                // 3. Initialize the WebR session
+                const webR = new WebR();
+                await webR.init();
+
+                // Update UI when ready
+                statusText.innerText = "WebR is Ready!";
+                statusBox.className = "ready";
+
+                // 4. Run a simple R command to test
+                let result = await webR.evalR('R.version.string');
+                let output = await result.toJs();
+                
+                outputDiv.innerText = `Successfully running: ${output.values[0]}`;
+
+            } catch (error) {
+                statusText.innerText = "Error loading WebR: " + error.message;
+                statusBox.style.background = "#f8d7da";
+                console.error(error);
+            }
+        }
+
+        startWebR();
+    </script>
 </body>
 </html>
