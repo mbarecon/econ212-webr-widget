@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebR Student Portal</title>
+    <title>WebR Custom Widget</title>
     
     <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
 
@@ -13,135 +13,105 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/r/r.min.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 15px; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-bottom: 15px; padding-bottom: 10px; }
+        #status { font-size: 0.9em; padding: 4px 10px; border-radius: 4px; }
+        .loading { background: #ffeeba; color: #856404; }
+        .ready { background: #d4edda; color: #155724; }
         
-        #status { font-size: 0.85em; font-weight: bold; padding: 6px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .loading { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .ready { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        /* Editor and Output Styling */
+        .CodeMirror { height: 200px; border-radius: 4px; font-size: 14px; }
+        .controls { margin: 15px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #ccc; }
+        button:hover:not(:disabled) { background: #0056b3; }
         
-        /* Editor Area */
-        .CodeMirror { height: 250px; border-radius: 8px; font-size: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
-        
-        /* Buttons */
-        .controls { margin: 20px 0; display: flex; gap: 10px; }
-        button { border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 14px; }
-        #run-btn { background: #28a745; color: white; flex-grow: 2; }
-        #run-btn:hover:not(:disabled) { background: #218838; transform: translateY(-1px); }
-        #clear-btn { background: #6c757d; color: white; flex-grow: 1; }
-        #clear-btn:hover { background: #5a6268; }
-        button:disabled { background: #cbd5e0 !important; cursor: not-allowed; transform: none !important; }
-
-        /* Output Areas */
-        h3 { font-size: 1.1em; color: #4a5568; margin-bottom: 8px; }
-        #output-console { background: #282a36; color: #f8f8f2; padding: 15px; border-radius: 8px; font-family: 'Fira Code', monospace; min-height: 60px; white-space: pre-wrap; margin-top: 5px; font-size: 14px; border: 1px solid #44475a; }
-        #canvas-container { margin-top: 25px; text-align: center; border: 2px dashed #e2e8f0; padding: 15px; background: #fff; border-radius: 8px; position: relative; }
-        canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-        .hint { font-size: 0.8em; color: #718096; margin-top: 10px; }
+        #output-console { background: #282a36; color: #f8f8f2; padding: 15px; border-radius: 4px; font-family: monospace; min-height: 50px; white-space: pre-wrap; margin-top: 10px; }
+        #canvas-container { margin-top: 20px; text-align: center; border: 1px dashed #ccc; padding: 10px; background: #fafafa; }
+        canvas { max-width: 100%; height: auto; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h2 style="margin:0; color: #2d3748;">R Programming Exercise</h2>
-        <span id="status" class="loading">Engine Loading...</span>
+        <h2>R WebR Widget</h2>
+        <span id="status" class="loading">Loading R...</span>
     </div>
 
-    <textarea id="code-editor"># Enter your R code here and press the Run button to execute your code.</textarea>
+    <textarea id="code-editor"># Write R code here
+print("Hello from WebR!")
+
+# Try a plot:
+x <- seq(0, 2*pi, length.out = 100)
+plot(x, sin(x), type = "l", col = "blue", lwd = 2, main = "Sine Wave")</textarea>
 
     <div class="controls">
-        <button id="run-btn" disabled>▶ Run Code</button>
-        <button id="clear-btn">Clear All</button>
+        <button id="run-btn" disabled>Run Code</button>
     </div>
 
-    <h3>Console Output</h3>
-    <div id="output-console">Waiting for WebR to initialize...</div>
+    <div id="output-console">System: Initializing Web Assembly...</div>
 
     <div id="canvas-container">
-        <h3>Plot Window</h3>
         <canvas id="canvas" width="1008" height="1008"></canvas>
-        <div class="hint">Plots generated via code will appear here automatically.</div>
     </div>
 </div>
 
 <script type="module">
     import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
 
-    // Initialize Code Editor
+    // Initialize Editor
     const editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
         mode: "r",
         theme: "dracula",
-        lineNumbers: true,
-        indentUnit: 2,
-        matchBrackets: true,
-        autoCloseBrackets: true
+        lineNumbers: true
     });
 
     const runBtn = document.getElementById('run-btn');
-    const clearBtn = document.getElementById('clear-btn');
     const outputConsole = document.getElementById('output-console');
     const status = document.getElementById('status');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
 
     async function init() {
-        try {
-            const webR = new WebR();
-            await webR.init();
+        const webR = new WebR();
+        await webR.init();
+        
+        status.innerText = "R Ready";
+        status.className = "ready";
+        runBtn.disabled = false;
+        outputConsole.innerText = "Console: Ready for input.";
+
+        runBtn.onclick = async () => {
+            runBtn.disabled = true;
+            outputConsole.innerText = "Running...";
             
-            status.innerText = "● R Ready";
-            status.className = "ready";
-            runBtn.disabled = false;
-            outputConsole.innerText = "System: WebR Engine active. Ready for student input.";
-
-            runBtn.onclick = async () => {
-                runBtn.disabled = true;
-                runBtn.innerText = "Running...";
+            // Set up graphics device
+            await webR.evalR("options(device = webr::canvas)");
+            
+            try {
+                // Execute code from editor
+                const shelter = await new webR.Shelter();
+                const result = await shelter.evalR(editor.getValue());
+                const output = await result.toJs();
                 
-                // Set the default graphics device to the HTML canvas
-                await webR.evalR("options(device = webr::canvas)");
+                // Display output
+                outputConsole.innerText = output.values ? output.values.join('\n') : "Code executed successfully.";
                 
-                try {
-                    const shelter = await new webR.Shelter();
-                    const result = await shelter.evalR(editor.getValue());
-                    const output = await result.toJs();
-                    
-                    // Display text output
-                    if (output.values && output.values.length > 0) {
-                        outputConsole.innerText = output.values.join('\n');
-                    } else {
-                        outputConsole.innerText = "Code executed successfully (no text output).";
+                // Capture any plots
+                const msgs = await webR.flush();
+                msgs.forEach(msg => {
+                    if (msg.type === 'canvas' && msg.data.event === 'drawCanvas') {
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(msg.data.image, 0, 0);
                     }
-                    
-                    // Check for and draw plots
-                    const msgs = await webR.flush();
-                    msgs.forEach(msg => {
-                        if (msg.type === 'canvas' && msg.data.event === 'drawCanvas') {
-                            ctx.drawImage(msg.data.image, 0, 0);
-                        }
-                    });
-                    
-                    await shelter.purge();
-                } catch (err) {
-                    outputConsole.innerText = "R Error: " + err.message;
-                } finally {
-                    runBtn.disabled = false;
-                    runBtn.innerText = "▶ Run Code";
-                }
-            };
-
-            clearBtn.onclick = () => {
-                outputConsole.innerText = "Console cleared.";
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            };
-
-        } catch (error) {
-            status.innerText = "● Initialization Error";
-            status.style.background = "#f8d7da";
-            outputConsole.innerText = "Critical Error: " + error.message;
-        }
+                });
+            } catch (err) {
+                outputConsole.innerText = "Error: " + err.message;
+            } finally {
+                runBtn.disabled = false;
+            }
+        };
     }
 
     init();
