@@ -12,14 +12,14 @@
       --border: #24304d;
       --text: #e6edf7;
       --muted: #94a3b8;
-      --accent: #6ea8fe;
-      --accent-2: #3b82f6;
+      --accent: #3b82f6;
+      --accent-2: #2563eb;
       --success: #22c55e;
       --danger: #ef4444;
       --console-bg: #0a0f1d;
       --editor-bg: #0e1528;
       --plot-bg: #ffffff;
-      --shadow: 0 8px 30px rgba(0,0,0,0.35);
+      --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
       --radius: 14px;
       --header-height: 62px;
     }
@@ -107,7 +107,7 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent-2), #2563eb);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white;
       box-shadow: 0 10px 24px rgba(37,99,235,0.28);
     }
@@ -124,7 +124,7 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(300px, 1.05fr) minmax(320px, 0.95fr);
+      grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 0.95fr);
       gap: 16px;
       padding: 16px;
       flex: 1;
@@ -180,12 +180,23 @@
       background: var(--editor-bg);
       flex: 1;
       min-height: 0;
+      display: flex;
     }
 
-    #editor {
+    #codeInput {
       width: 100%;
       height: 100%;
-      min-height: 360px;
+      min-height: 380px;
+      border: 0;
+      outline: none;
+      resize: none;
+      padding: 18px;
+      background: var(--editor-bg);
+      color: #e5edf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      tab-size: 2;
     }
 
     .tabs {
@@ -348,7 +359,7 @@
       .workspace {
         grid-template-columns: 1fr;
       }
-      #editor {
+      #codeInput {
         min-height: 300px;
       }
     }
@@ -376,7 +387,7 @@
         <div class="hint">Run with <span class="kbd">Shift</span> + <span class="kbd">Enter</span></div>
       </div>
       <div class="editor-wrap">
-        <div id="editor"></div>
+        <textarea id="codeInput" spellcheck="false"></textarea>
       </div>
       <div class="statusbar">
         <div class="status-left">
@@ -412,12 +423,10 @@
     </section>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script type="module">
-    import { WebR, ChannelType } from 'https://webr.r-wasm.org/latest/webr.mjs';
+    import { WebR, ChannelType } from "https://webr.r-wasm.org/latest/webr.mjs";
 
     let webR = null;
-    let editor = null;
     let ready = false;
     let running = false;
 
@@ -426,40 +435,27 @@ x <- rnorm(1000)
 summary(x)
 hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
 
-    const consoleEl = document.getElementById('console');
-    const plotStack = document.getElementById('plotStack');
-    const plotEmpty = document.getElementById('plotEmpty');
-    const runBtn = document.getElementById('runBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const runMeta = document.getElementById('runMeta');
-    const statusText = document.getElementById('statusText');
-    const statusDot = document.getElementById('statusDot');
+    const codeInput = document.getElementById("codeInput");
+    const consoleEl = document.getElementById("console");
+    const plotStack = document.getElementById("plotStack");
+    const plotEmpty = document.getElementById("plotEmpty");
+    const runBtn = document.getElementById("runBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const runMeta = document.getElementById("runMeta");
+    const statusText = document.getElementById("statusText");
+    const statusDot = document.getElementById("statusDot");
 
-    function initEditor() {
-      editor = ace.edit('editor');
-      editor.setTheme('ace/theme/tomorrow_night_bright');
-      editor.session.setMode('ace/mode/r');
-      editor.session.setUseSoftTabs(true);
-      editor.session.setTabSize(2);
-      editor.setShowPrintMargin(false);
-      editor.setHighlightActiveLine(true);
-      editor.setValue(starterCode, -1);
-      editor.commands.addCommand({
-        name: 'runCode',
-        bindKey: { win: 'Shift-Enter', mac: 'Shift-Enter' },
-        exec: () => runCode(),
-      });
-    }
+    codeInput.value = starterCode;
 
-    function setStatus(message, state = 'loading') {
+    function setStatus(message, state = "loading") {
       statusText.textContent = message;
-      statusDot.classList.remove('ready', 'error');
-      if (state === 'ready') statusDot.classList.add('ready');
-      if (state === 'error') statusDot.classList.add('error');
+      statusDot.classList.remove("ready", "error");
+      if (state === "ready") statusDot.classList.add("ready");
+      if (state === "error") statusDot.classList.add("error");
     }
 
-    function appendConsole(text, cls = '') {
-      const line = document.createElement('div');
+    function appendConsole(text, cls = "") {
+      const line = document.createElement("div");
       line.className = `console-line ${cls}`.trim();
       line.textContent = text;
       consoleEl.appendChild(line);
@@ -476,19 +472,19 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
     }
 
     function clearAll() {
-      editor.setValue('', -1);
+      codeInput.value = "";
       clearConsole();
       clearPlots();
-      runMeta.textContent = 'Cleared';
-      activateTab('console');
+      runMeta.textContent = "Cleared";
+      activateTab("console");
     }
 
     function activateTab(name) {
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === name);
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tab === name);
       });
-      document.getElementById('consolePanel').classList.toggle('active', name === 'console');
-      document.getElementById('plotsPanel').classList.toggle('active', name === 'plots');
+      document.getElementById("consolePanel").classList.toggle("active", name === "console");
+      document.getElementById("plotsPanel").classList.toggle("active", name === "plots");
     }
 
     function showPlots(images) {
@@ -499,13 +495,12 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
       }
 
       images.forEach((img) => {
-        const card = document.createElement('div');
-        card.className = 'plot-card';
-        const canvas = document.createElement('canvas');
+        const card = document.createElement("div");
+        card.className = "plot-card";
+        const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, img.width, img.height);
+        canvas.getContext("2d").drawImage(img, 0, 0, img.width, img.height);
         card.appendChild(canvas);
         plotStack.appendChild(card);
       });
@@ -514,117 +509,130 @@ hist(x, col = "#60a5fa", border = "white", main = "Histogram of x")`;
     async function drawFlushedCanvasMessages() {
       const flushed = await webR.flush();
       const images = [];
+
       flushed.forEach(msg => {
-        if (msg.type === 'canvas' && msg.data && msg.data.event === 'canvasImage') {
+        if (msg.type === "canvas" && msg.data && msg.data.event === "canvasImage" && msg.data.image) {
           images.push(msg.data.image);
         }
       });
+
       if (images.length > 0) {
-        plotStack.replaceChildren();
-        images.forEach((img) => {
-          const card = document.createElement('div');
-          card.className = 'plot-card';
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          card.appendChild(canvas);
-          plotStack.appendChild(card);
-        });
-        activateTab('plots');
+        showPlots(images);
+        activateTab("plots");
       }
     }
 
     async function initWebR() {
       try {
-        setStatus('Loading webR...', 'loading');
+        setStatus("Loading webR...", "loading");
         webR = new WebR({
           channelType: ChannelType.PostMessage,
           interactive: false,
         });
         await webR.init();
-        await webR.evalRVoid('options(device = webr::canvas)');
+        await webR.evalRVoid("options(device = webr::canvas)");
         ready = true;
         runBtn.disabled = false;
-        setStatus('webR ready', 'ready');
-        appendConsole('webR ready. Run some R code.', 'message');
+        setStatus("webR ready", "ready");
+        appendConsole("webR ready. Run some R code.", "message");
       } catch (err) {
         ready = false;
         runBtn.disabled = true;
-        setStatus(`Failed to load webR: ${err.message}`, 'error');
-        appendConsole(`Initialization error: ${err.message}`, 'error');
+        setStatus(`Failed to load webR: ${err.message}`, "error");
+        appendConsole(`Initialization error: ${err.message}`, "error");
       }
     }
 
     async function runCode() {
       if (!ready || running) return;
 
-      const code = editor.getValue();
+      const code = codeInput.value;
       if (!code.trim()) {
-        appendConsole('Nothing to run.', 'warning');
+        appendConsole("Nothing to run.", "warning");
         return;
       }
 
       running = true;
       runBtn.disabled = true;
-      runMeta.textContent = 'Running...';
-      setStatus('Running R code...', 'loading');
+      runMeta.textContent = "Running...";
+      setStatus("Running R code...", "loading");
       clearConsole();
       clearPlots();
-      activateTab('console');
-      appendConsole('> Running code...', 'prompt');
+      activateTab("console");
+      appendConsole("> Running code...", "prompt");
 
       let shelter = null;
+
       try {
         shelter = await new webR.Shelter();
+
+        await webR.evalRVoid("graphics.off(); options(device = webr::canvas)");
+
         const capture = await shelter.captureR(code, {
           withAutoprint: true,
+          captureGraphics: {
+            width: 800,
+            height: 500,
+            bg: "white"
+          }
         });
 
-        if (capture.output.length === 0) {
-          appendConsole('[no console output]');
+        if (!capture.output || capture.output.length === 0) {
+          appendConsole("[no console output]");
         } else {
           for (const item of capture.output) {
-            const type = item.type || '';
-            const text = typeof item.data === 'string' ? item.data : JSON.stringify(item.data);
+            const type = item.type || "";
+            let text = "";
+            if (typeof item.data === "string") {
+              text = item.data;
+            } else if (item.data === undefined || item.data === null) {
+              text = "";
+            } else {
+              text = JSON.stringify(item.data);
+            }
             appendConsole(text, type);
           }
         }
 
         if (capture.images && capture.images.length > 0) {
           showPlots(capture.images);
-          activateTab('plots');
+          activateTab("plots");
         } else {
           await drawFlushedCanvasMessages();
         }
 
-        const plotCount = document.querySelectorAll('.plot-card').length;
-        runMeta.textContent = plotCount > 0 ? `Done · ${plotCount} plot${plotCount === 1 ? '' : 's'}` : 'Done';
-        setStatus('webR ready', 'ready');
+        const plotCount = document.querySelectorAll(".plot-card").length;
+        runMeta.textContent = plotCount > 0 ? `Done · ${plotCount} plot${plotCount === 1 ? "" : "s"}` : "Done";
+        setStatus("webR ready", "ready");
       } catch (err) {
-        appendConsole(`Error: ${err.message}`, 'error');
-        runMeta.textContent = 'Error';
-        setStatus('Execution error', 'error');
+        appendConsole(`Error: ${err.message}`, "error");
+        runMeta.textContent = "Error";
+        setStatus("Execution error", "error");
       } finally {
-        if (shelter) shelter.purge();
+        if (shelter) {
+          try {
+            shelter.purge();
+          } catch (_) {}
+        }
         running = false;
         runBtn.disabled = !ready;
-        if (ready && statusText.textContent === 'Execution error') {
-          // keep error status until next successful run
-        } else if (ready) {
-          setStatus('webR ready', 'ready');
-        }
       }
     }
 
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => activateTab(btn.dataset.tab));
     });
 
-    runBtn.addEventListener('click', runCode);
-    clearBtn.addEventListener('click', clearAll);
+    runBtn.addEventListener("click", runCode);
+    clearBtn.addEventListener("click", clearAll);
 
-    initEditor();
+    codeInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && event.shiftKey) {
+        event.preventDefault();
+        runCode();
+      }
+    });
+
     initWebR();
   </script>
 </body>
