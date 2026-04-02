@@ -1,6 +1,33 @@
-<script type="module">
-  import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
-  const webR = new WebR();
-  await webR.init();
-  console.log("WebR is ready!");
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebR Widget</title>
+  <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
+</head>
+<body>
+  <h1>WebR Status: <span id="status">Loading...</span></h1>
+  <div id="output"></div>
+
+  <script type="module">
+    import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
+    
+    async function initWebR() {
+      const status = document.getElementById('status');
+      try {
+        const webR = new WebR();
+        await webR.init();
+        status.innerText = "Ready! ✅";
+        
+        // Test execution
+        const result = await webR.evalR('R.version.string');
+        document.getElementById('output').innerText = await result.toJs();
+      } catch (e) {
+        status.innerText = "Error ❌";
+        console.error(e);
+      }
+    }
+
+    initWebR();
+  </script>
+</body>
+</html>
