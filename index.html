@@ -259,7 +259,6 @@ plot(
 
     const statusEl = document.getElementById("status");
     const codeEl = document.getElementById("code");
-    const consoleEl = document.getElementById("console");
     const plotEl = document.getElementById("plot");
     const runBtn = document.getElementById("runBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -287,15 +286,34 @@ plot(
       plotEl.innerHTML = "";
     }
 
+    function drawCapturedImages(images) {
+      plotEl.innerHTML = "";
+
+      if (!images || !images.length) {
+        plotEl.innerHTML = '<p class="subtle">No plot was produced in this run.</p>';
+        return;
+      }
+
+      images.forEach((image, index) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        canvas.style.maxWidth = "100%";
+        canvas.style.height = "auto";
+        canvas.style.display = "block";
+        if (index > 0) canvas.style.marginTop = "16px";
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0);
+        plotEl.appendChild(canvas);
+      });
+    }
+
     async function initWebR() {
       try {
-        webR = new WebR({
-          stdout: (text) => appendConsole(text),
-          stderr: (text) => appendConsole(text),
-        });
-
+        webR = new WebR();
         await webR.init();
-        shelter = await new webR.Shelter();
+        shelter = new webR.Shelter();
 
         setStatus("WebR is ready.");
         runBtn.disabled = false;
@@ -303,43 +321,38 @@ plot(
         clearBtn.disabled = false;
       } catch (error) {
         console.error(error);
-        setStatus("WebR failed to load. If this is GitHub Pages, wait a moment and refresh.", true);
+        setStatus("WebR failed to load. Refresh the page and check the browser console.", true);
         appendConsole(`Error loading WebR:\n${error.message}\n`);
       }
     }
 
-    async function renderPlot() {
-      const canvases = document.querySelectorAll("canvas");
-      if (!canvases.length) return;
-
-      plotEl.innerHTML = "";
-
-      canvases.forEach((canvas) => {
-        const clone = document.createElement("canvas");
-        clone.width = canvas.width;
-        clone.height = canvas.height;
-        const ctx = clone.getContext("2d");
-        ctx.drawImage(canvas, 0, 0);
-        plotEl.appendChild(clone);
-      });
-    }
-
     async function runCode() {
-      if (!webR) return;
+      if (!webR || !shelter) return;
 
       runBtn.disabled = true;
       setStatus("Running R code...");
       clearOutput();
 
       try {
-        await webR.evalRVoid("graphics.off()");
-        await webR.evalRVoid("options(device = function(...) grDevices::png(filename = NULL, width = 800, height = 500, res = 120))");
+        const result = await shelter.captureR(
+          `webr::canvas()\n${codeEl.value}\ndev.off()`,
+          {
+            withAutoprint: true,
+            captureStreams: true,
+            captureConditions: false,
+            captureGraphics: true
+          }
+        );
 
-        await shelter.captureR(codeEl.value, {
-          withAutoprint: true,
-        });
+        if (result.output && result.output.length) {
+          result.output.forEach((msg) => {
+            if (msg.type === "stdout" || msg.type === "stderr") {
+              appendConsole(String(msg.data));
+            }
+          });
+        }
 
-        await renderPlot();
+        drawCapturedImages(result.images);
         setStatus("Run complete.");
       } catch (error) {
         console.error(error);
