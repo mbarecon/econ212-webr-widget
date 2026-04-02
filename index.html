@@ -1,429 +1,154 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>R Practice</title>
-  <style>
-    :root {
-      --bg: #f6f8fb;
-      --panel: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #dbe3ee;
-      --accent: #2563eb;
-      --accent-dark: #1d4ed8;
-      --editor-bg: #0f172a;
-      --editor-text: #e5e7eb;
-      --console-bg: #111827;
-      --console-text: #d1fae5;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebR Interactive Interface</title>
+    
+    <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
 
-    * { box-sizing: border-box; }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/r/r.min.js"></script>
 
-    body {
-      margin: 0;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-    }
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, sans-serif; background: #1e1e1e; color: white; overflow: hidden; }
+        
+        /* Layout like the Demo */
+        .main-wrapper { display: flex; flex-direction: column; height: 100vh; }
+        
+        .toolbar { background: #333; padding: 10px 20px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #444; }
+        .status-indicator { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #444; }
+        .ready { color: #4ade80; border: 1px solid #4ade80; }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
-    }
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Left: Editor */
+        .editor-pane { flex: 1; border-right: 1px solid #444; display: flex; flex-direction: column; }
+        .CodeMirror { flex: 1; font-size: 14px; }
 
-    h1 {
-      margin: 0 0 8px;
-      font-size: 2rem;
-    }
+        /* Right: Output (Console & Plots) */
+        .output-pane { width: 450px; display: flex; flex-direction: column; background: #000; }
+        #console { flex: 1; padding: 15px; font-family: 'Fira Code', monospace; font-size: 13px; color: #d1d1d1; overflow-y: auto; white-space: pre-wrap; border-bottom: 1px solid #333; }
+        #plot-area { height: 350px; background: white; display: flex; align-items: center; justify-content: center; position: relative; }
+        canvas { max-width: 100%; max-height: 100%; }
 
-    .subtitle {
-      margin: 0 0 18px;
-      color: var(--muted);
-      max-width: 760px;
-    }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #eef2ff;
-      color: #3730a3;
-      border: 1px solid #c7d2fe;
-      font-size: 0.95rem;
-      margin-bottom: 18px;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #f59e0b;
-    }
-
-    .dot.ready { background: #10b981; }
-    .dot.error { background: #ef4444; }
-    .dot.running { background: #2563eb; }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 20px;
-      align-items: start;
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--border);
-      background: #fafcff;
-      font-weight: 700;
-    }
-
-    .panel-body {
-      padding: 18px;
-    }
-
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: white;
-      color: var(--text);
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      border-color: #bfd0ea;
-      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.08);
-    }
-
-    button.primary {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
-
-    button.primary:hover {
-      background: var(--accent-dark);
-      border-color: var(--accent-dark);
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 460px;
-      resize: vertical;
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      background: var(--editor-bg);
-      color: var(--editor-text);
-      padding: 16px;
-      font-family: "SFMono-Regular", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.95rem;
-      line-height: 1.5;
-      tab-size: 2;
-    }
-
-    .hint {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-
-    .output-grid {
-      display: grid;
-      grid-template-rows: auto auto;
-      gap: 20px;
-    }
-
-    pre {
-      margin: 0;
-      padding: 14px;
-      min-height: 230px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: var(--console-bg);
-      color: var(--console-text);
-      border-radius: 16px;
-      font-family: "SFMono-Regular", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.92rem;
-    }
-
-    #plot {
-      min-height: 260px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: flex-start;
-      justify-content: flex-start;
-      border: 1px dashed var(--border);
-      border-radius: 16px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-      padding: 12px;
-      overflow: auto;
-    }
-
-    #plot canvas {
-      max-width: 100%;
-      height: auto;
-      border-radius: 8px;
-      background: white;
-    }
-
-    .empty-state {
-      color: var(--muted);
-      text-align: center;
-      padding: 24px;
-      width: 100%;
-    }
-
-    @media (max-width: 900px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      textarea {
-        min-height: 360px;
-      }
-    }
-  </style>
+        /* Buttons */
+        button { background: #3b82f6; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .btn-clear { background: #ef4444; }
+        .btn-clear:hover { background: #dc2626; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>R Practice</h1>
-    <p class="subtitle">Write R code and run it directly in your browser with webR.</p>
-    <div class="status">
-      <span id="statusDot" class="dot"></span>
-      <span id="statusText">Loading webR...</span>
+
+<div class="main-wrapper">
+    <div class="toolbar">
+        <strong>WebR Session</strong>
+        <span id="status" class="status-indicator">Initializing...</span>
+        <button id="run-btn" disabled>Run (Ctrl+Enter)</button>
+        <button id="clear-btn" class="btn-clear">Clear All</button>
     </div>
 
-    <main class="layout">
-      <section class="panel">
-        <div class="panel-header">Editor</div>
-        <div class="panel-body">
-          <div class="controls">
-            <button id="runBtn" class="primary" disabled>Run Code</button>
-            <button id="resetBtn" disabled>Reset</button>
-            <button id="clearBtn" disabled>Clear</button>
-          </div>
-          <textarea id="editor" spellcheck="false"></textarea>
-          <p class="hint">Tip: edit the starter code, then click <strong>Run Code</strong>.</p>
+    <div class="workspace">
+        <div class="editor-pane">
+            <textarea id="code-editor"># Enter your R code here and press the Run button to execute your code.</textarea>
         </div>
-      </section>
-
-      <section class="output-grid">
-        <section class="panel">
-          <div class="panel-header">Console</div>
-          <div class="panel-body">
-            <pre id="console">Loading webR, please wait...</pre>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">Plot</div>
-          <div class="panel-body">
-            <div id="plot">
-              <div class="empty-state">Run code that creates a plot to display it here.</div>
+        
+        <div class="output-pane">
+            <div id="console">Loading Web Assembly binaries...</div>
+            <div id="plot-area">
+                <canvas id="canvas" width="1008" height="1008"></canvas>
             </div>
-          </div>
-        </section>
-      </section>
-    </main>
-  </div>
+        </div>
+    </div>
+</div>
 
-  <script type="module">
-    import { WebR, ChannelType } from 'https://webr.r-wasm.org/latest/webr.mjs';
+<script type="module">
+    import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
 
-    const starterCode = `# Basic summary statistics
-values <- c(12, 15, 14, 17, 19, 21, 18, 16)
+    const editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+        mode: "r",
+        theme: "dracula",
+        lineNumbers: true,
+        matchBrackets: true
+    });
 
-mean(values)
-sd(values)
+    const runBtn = document.getElementById('run-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const consoleDiv = document.getElementById('console');
+    const statusSpan = document.getElementById('status');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-plot(values, type = "b", pch = 19,
-     main = "Sample Data",
-     ylab = "Value", xlab = "Observation")`;
-
-    const editor = document.getElementById('editor');
-    const consoleEl = document.getElementById('console');
-    const plotEl = document.getElementById('plot');
-    const runBtn = document.getElementById('runBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const statusText = document.getElementById('statusText');
-    const statusDot = document.getElementById('statusDot');
-
-    editor.value = starterCode;
-
-    let webR = null;
-    let running = false;
-
-    function setStatus(message, state = '') {
-      statusText.textContent = message;
-      statusDot.className = `dot ${state}`.trim();
-    }
-
-    function setButtons(enabled) {
-      runBtn.disabled = !enabled || running;
-      resetBtn.disabled = !enabled || running;
-      clearBtn.disabled = !enabled || running;
-    }
-
-    function clearPlot() {
-      plotEl.innerHTML = '<div class="empty-state">Run code that creates a plot to display it here.</div>';
-    }
-
-    function clearConsole() {
-      consoleEl.textContent = '';
-    }
-
-    function normalizeOutput(output) {
-      if (!output || output.length === 0) {
-        return '[No console output]';
-      }
-
-      const parts = [];
-
-      output.forEach((item) => {
-        if (typeof item.data === 'string' && item.data.length > 0) {
-          parts.push(item.data);
-          return;
-        }
-
-        if (item.type && item.type !== 'stdout') {
-          parts.push(`[${item.type}]`);
-        }
-      });
-
-      const text = parts.join('');
-      return text.trim().length > 0 ? text : '[No console output]';
-    }
-
-    function renderOutput(output) {
-      consoleEl.textContent = normalizeOutput(output);
-    }
-
-    function renderImages(images) {
-      plotEl.innerHTML = '';
-
-      if (!images || images.length === 0) {
-        clearPlot();
-        return;
-      }
-
-      images.forEach((img) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-        plotEl.appendChild(canvas);
-      });
-    }
-
-    async function initWebR() {
-      try {
-        setStatus('Loading webR...', 'running');
-
-        webR = new WebR({
-          channelType: ChannelType.PostMessage
-        });
-
+    async function init() {
+        const webR = new WebR();
         await webR.init();
-        await webR.evalRVoid('options(device = webr::canvas)');
+        
+        statusSpan.innerText = "Ready";
+        statusSpan.classList.add("ready");
+        runBtn.disabled = false;
+        consoleDiv.innerText = "R engine connected. System ready.\n";
 
-        setStatus('webR is ready', 'ready');
-        consoleEl.textContent = 'webR is ready. Click Run Code to begin.';
-        setButtons(true);
-      } catch (error) {
-        setStatus('webR failed to load', 'error');
-        consoleEl.textContent = `Failed to load webR.\n\n${error?.message || error}`;
-      }
-    }
+        // Main Execution Logic
+        const executeR = async () => {
+            runBtn.disabled = true;
+            const code = editor.getValue();
+            
+            // Clear previous plot for new run
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Tell R to use the HTML canvas for plotting
+            await webR.evalR("options(device = webr::canvas)");
 
-    async function runCode() {
-      if (!webR || running) return;
+            try {
+                const shelter = await new webR.Shelter();
+                const result = await shelter.evalR(code);
+                const output = await result.toJs();
+                
+                // Show console results
+                if (output.values) {
+                    consoleDiv.innerText += `> ${code.split('\n')[0]}...\n${output.values.join('\n')}\n`;
+                }
 
-      running = true;
-      setButtons(true);
-      setStatus('Running R code...', 'running');
-      clearConsole();
-      clearPlot();
+                // PLOT HANDLING: Flush the message queue to draw the canvas
+                const msgs = await webR.flush();
+                msgs.forEach(msg => {
+                    if (msg.type === 'canvas' && msg.data.event === 'drawCanvas') {
+                        ctx.drawImage(msg.data.image, 0, 0);
+                    }
+                });
 
-      let shelter = null;
+                await shelter.purge();
+            } catch (err) {
+                consoleDiv.innerText += `Error: ${err.message}\n`;
+            } finally {
+                runBtn.disabled = false;
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            }
+        };
 
-      try {
-        shelter = await new webR.Shelter();
-        const capture = await shelter.captureR(editor.value, {
-          withAutoprint: true,
-          captureGraphics: {
-            width: 504,
-            height: 504,
-            bg: 'white'
-          }
+        runBtn.onclick = executeR;
+
+        // Clear Functionality
+        clearBtn.onclick = () => {
+            editor.setValue("# Enter your R code here and press the Run button to execute your code.");
+            consoleDiv.innerText = "Console cleared.\n";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+
+        // Shortcut: Ctrl + Enter
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                executeR();
+            }
         });
-
-        renderOutput(capture.output);
-        renderImages(capture.images);
-        setStatus('webR is ready', 'ready');
-      } catch (error) {
-        setStatus('Code execution failed', 'error');
-        consoleEl.textContent = `Error: ${error?.message || error}`;
-      } finally {
-        if (shelter) {
-          shelter.purge();
-        }
-        running = false;
-        setButtons(true);
-      }
     }
 
-    runBtn.addEventListener('click', runCode);
+    init();
+</script>
 
-    resetBtn.addEventListener('click', () => {
-      editor.value = starterCode;
-      if (webR) setStatus('webR is ready', 'ready');
-    });
-
-    clearBtn.addEventListener('click', () => {
-      clearConsole();
-      clearPlot();
-      if (webR) setStatus('webR is ready', 'ready');
-    });
-
-    initWebR();
-  </script>
 </body>
 </html>
