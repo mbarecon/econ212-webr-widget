@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebR Interactive Interface</title>
+    <title>WebR Interactive Console</title>
     
     <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
 
@@ -13,44 +13,51 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/r/r.min.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, sans-serif; background: #1e1e1e; color: white; overflow: hidden; }
+        :root { --bg: #1e1e1e; --border: #333; --accent: #3b82f6; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; background: var(--bg); color: white; overflow: hidden; }
         
-        /* Layout like the Demo */
-        .main-wrapper { display: flex; flex-direction: column; height: 100vh; }
+        .layout { display: flex; flex-direction: column; height: 100vh; }
         
-        .toolbar { background: #333; padding: 10px 20px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #444; }
-        .status-indicator { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #444; }
-        .ready { color: #4ade80; border: 1px solid #4ade80; }
-
+        /* Top Navigation Bar */
+        header { background: #252526; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .controls { display: flex; gap: 10px; }
+        
+        /* Main Workspace */
         .workspace { display: flex; flex: 1; overflow: hidden; }
         
-        /* Left: Editor */
-        .editor-pane { flex: 1; border-right: 1px solid #444; display: flex; flex-direction: column; }
-        .CodeMirror { flex: 1; font-size: 14px; }
+        /* Left: Code Editor */
+        .editor-pane { flex: 1; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .CodeMirror { flex: 1; font-size: 14px; background: #1e1e1e !important; }
 
-        /* Right: Output (Console & Plots) */
-        .output-pane { width: 450px; display: flex; flex-direction: column; background: #000; }
-        #console { flex: 1; padding: 15px; font-family: 'Fira Code', monospace; font-size: 13px; color: #d1d1d1; overflow-y: auto; white-space: pre-wrap; border-bottom: 1px solid #333; }
-        #plot-area { height: 350px; background: white; display: flex; align-items: center; justify-content: center; position: relative; }
-        canvas { max-width: 100%; max-height: 100%; }
+        /* Right: Results */
+        .output-pane { width: 40%; min-width: 350px; display: flex; flex-direction: column; background: #000; }
+        #console { flex: 1; padding: 15px; font-family: 'Fira Code', monospace; font-size: 13px; color: #d1d1d1; overflow-y: auto; white-space: pre-wrap; border-bottom: 1px solid var(--border); }
+        
+        /* Plotting Area */
+        #plot-area { height: 40%; background: white; display: flex; align-items: center; justify-content: center; overflow: hidden; border-top: 4px solid var(--border); }
+        canvas { max-width: 100%; max-height: 100%; background: white; }
 
-        /* Buttons */
-        button { background: #3b82f6; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
-        button:hover { background: #2563eb; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        .btn-clear { background: #ef4444; }
-        .btn-clear:hover { background: #dc2626; }
+        /* Buttons Styles */
+        button { background: var(--accent); color: white; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px; }
+        button:hover:not(:disabled) { background: #2563eb; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-clear { background: #444; }
+        .btn-clear:hover { background: #555; }
+
+        #status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block; margin-right: 8px; }
+        .ready #status-dot { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
     </style>
 </head>
-<body>
+<body class="loading">
 
-<div class="main-wrapper">
-    <div class="toolbar">
-        <strong>WebR Session</strong>
-        <span id="status" class="status-indicator">Initializing...</span>
-        <button id="run-btn" disabled>Run (Ctrl+Enter)</button>
-        <button id="clear-btn" class="btn-clear">Clear All</button>
-    </div>
+<div class="layout">
+    <header id="header">
+        <div><span id="status-dot"></span> <strong>WebR Studio</strong></div>
+        <div class="controls">
+            <button id="run-btn" disabled>Run Code</button>
+            <button id="clear-btn" class="btn-clear">Clear All</button>
+        </div>
+    </header>
 
     <div class="workspace">
         <div class="editor-pane">
@@ -58,9 +65,9 @@
         </div>
         
         <div class="output-pane">
-            <div id="console">Loading Web Assembly binaries...</div>
+            <div id="console">Initializing R WebAssembly engine...</div>
             <div id="plot-area">
-                <canvas id="canvas" width="1008" height="1008"></canvas>
+                <canvas id="canvas" width="1000" height="1000"></canvas>
             </div>
         </div>
     </div>
@@ -69,54 +76,58 @@
 <script type="module">
     import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
 
+    // 1. Setup Editor
     const editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
         mode: "r",
         theme: "dracula",
         lineNumbers: true,
-        matchBrackets: true
+        matchBrackets: true,
+        autoCloseBrackets: true
     });
 
     const runBtn = document.getElementById('run-btn');
     const clearBtn = document.getElementById('clear-btn');
     const consoleDiv = document.getElementById('console');
-    const statusSpan = document.getElementById('status');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const header = document.getElementById('header');
 
-    async function init() {
-        const webR = new WebR();
+    // 2. Initialize WebR
+    const webR = new WebR();
+    
+    async function start() {
         await webR.init();
-        
-        statusSpan.innerText = "Ready";
-        statusSpan.classList.add("ready");
+        header.classList.add('ready');
         runBtn.disabled = false;
-        consoleDiv.innerText = "R engine connected. System ready.\n";
+        consoleDiv.innerText = "R engine ready.\n";
 
         // Main Execution Logic
-        const executeR = async () => {
+        const runR = async () => {
             runBtn.disabled = true;
             const code = editor.getValue();
             
-            // Clear previous plot for new run
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Clear screen for new output
+            consoleDiv.innerText += `\n> Running Selection...\n`;
             
-            // Tell R to use the HTML canvas for plotting
+            // Set R to use the canvas device
             await webR.evalR("options(device = webr::canvas)");
 
             try {
                 const shelter = await new webR.Shelter();
                 const result = await shelter.evalR(code);
-                const output = await result.toJs();
                 
-                // Show console results
+                // Handle Text Output
+                const output = await result.toJs();
                 if (output.values) {
-                    consoleDiv.innerText += `> ${code.split('\n')[0]}...\n${output.values.join('\n')}\n`;
+                    consoleDiv.innerText += output.values.join('\n') + '\n';
                 }
 
-                // PLOT HANDLING: Flush the message queue to draw the canvas
+                // HANDLE PLOTS (Critical Fix)
+                // We must flush the event queue to see the graphics instructions
                 const msgs = await webR.flush();
-                msgs.forEach(msg => {
+                msgs.forEach((msg) => {
                     if (msg.type === 'canvas' && msg.data.event === 'drawCanvas') {
+                        // This actually draws the image object sent from R onto our HTML canvas
                         ctx.drawImage(msg.data.image, 0, 0);
                     }
                 });
@@ -130,24 +141,22 @@
             }
         };
 
-        runBtn.onclick = executeR;
+        runBtn.onclick = runR;
 
-        // Clear Functionality
+        // Clear Everything
         clearBtn.onclick = () => {
             editor.setValue("# Enter your R code here and press the Run button to execute your code.");
             consoleDiv.innerText = "Console cleared.\n";
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         };
 
-        // Shortcut: Ctrl + Enter
+        // Support Ctrl+Enter
         window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                executeR();
-            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runR();
         });
     }
 
-    init();
+    start();
 </script>
 
 </body>
