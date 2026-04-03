@@ -1,1 +1,66 @@
-<script type="text/javascript" src="//cdn.datacamp.com/dcl-react.js.gz"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ECON 212 R Practice: Vectors</title>
+
+  <!-- DataCamp Light -->
+  <script type="text/javascript" src="https://cdn.datacamp.com/dcl-react.js.gz"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      max-width: 1000px;
+    }
+    h1 { margin-bottom: 0.4rem; }
+    p { line-height: 1.5; }
+    [data-datacamp-exercise] {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <h1>R Practice: Creating a Vector</h1>
+  <p>Complete the exercise below, then click <strong>Submit</strong>.</p>
+
+  <div
+    id="econ212-r-01"
+    data-datacamp-exercise
+    data-lang="r"
+    data-height="550"
+    data-show-run-button
+    data-no-lazy-load
+  >
+    <code data-type="pre-exercise-code">
+# no pec
+    </code>
+
+    <code data-type="sample-code">
+# Create a vector x with the values 2, 4, 6, and 8
+
+# Print x
+    </code>
+
+    <code data-type="solution">
+# Create a vector x with the values 2, 4, 6, and 8
+x <- c(2, 4, 6, 8)
+
+# Print x
+print(x)
+    </code>
+
+    <code data-type="sct">
+test_object("x")
+test_function("c")
+test_function("print")
+success_msg("Nice work — you created and printed the vector correctly.")
+    </code>
+
+    <div data-type="hint">
+      Use <code>c(2, 4, 6, 8)</code> to create the vector, assign it with <code>&lt;-</code>, and then use <code>print(x)</code>.
+    </div>
+  </div>
+</body>
+</html>
