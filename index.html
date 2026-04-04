@@ -2,26 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>R Web Console</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://oi-j.github.io/coi-serviceworker/coi-serviceworker.min.js"></script>
+  <title>Advanced webR Console</title>
+  
+  <script type="module">
+    import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
+    import { EditorView, basicSetup } from 'https://esm.sh/codemirror@6.0.1';
+    import { r } from 'https://esm.sh/@codemirror/lang-r@6.0.1';
+    import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark@6.0.1';
+
+    // Initialize webR
+    const webR = new WebR();
+    await webR.init();
+    window.webR = webR;
+    document.getElementById('status').innerText = "webR Ready ✅";
+
+    // Initialize CodeMirror
+    const editorParent = document.getElementById('editor-container');
+    window.editor = new EditorView({
+      doc: "# Insert your code here\nprint('Hello from webR!')",
+      extensions: [
+        basicSetup,
+        r(),
+        oneDark,
+        EditorView.lineWrapping
+      ],
+      parent: editorParent
+    });
+  </script>
+
+  <style>
+    body { font-family: system-ui; margin: 0; display: grid; grid-template-columns: 1fr 1fr; height: 100vh; overflow: hidden; }
+    #left-panel, #right-panel { display: flex; flex-direction: column; height: 100%; }
+    #left-panel { border-right: 1px solid #333; background: #282c34; }
+    
+    /* CodeMirror Container */
+    #editor-container { flex-grow: 1; overflow: auto; font-size: 14px; }
+    .cm-editor { height: 100%; }
+
+    #output { height: 35%; background: #1e1e1e; color: #abb2bf; padding: 10px; overflow-y: auto; font-family: 'Fira Code', monospace; font-size: 13px; border-top: 2px solid #333; }
+    #plot-canvas { flex-grow: 1; background: white; display: flex; align-items: center; justify-content: center; }
+    canvas { max-width: 95%; max-height: 95%; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    
+    .toolbar { padding: 8px 15px; background: #21252b; color: white; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #181a1f; }
+    button { background: #4a4e58; color: white; border: none; padding: 5px 12px; cursor: pointer; border-radius: 4px; font-size: 12px; }
+    button:hover { background: #61afef; }
+    #status { font-size: 11px; color: #98c379; margin-left: auto; }
+  </style>
 </head>
 <body>
-  <div class="app-container">
-    <div class="toolbar">
-      <span id="status">Initializing R...</span>
-      <button id="run-btn" disabled>Run Code</button>
-      <button id="clear-btn">Clear All</button>
-    </div>
-    <div class="main-layout">
-      <div id="editor-container"></div>
-      <div class="output-area">
-        <pre id="console-output"></pre>
-        <div id="plot-output"></div>
-      </div>
-    </div>
+
+<div id="left-panel">
+  <div class="toolbar">
+    <button onclick="runCode()">▶ Run (Ctrl+Enter)</button>
+    <button onclick="clearAll()">🗑 Clear</button>
+    <span id="status">Loading webR... ⏳</span>
   </div>
-  <script type="module" src="main.js"></script>
+  <div id="editor-container"></div>
+  <div id="output">System ready.</div>
+</div>
+
+<div id="right-panel">
+  <div class="toolbar"><strong>R Graphics Device</strong></div>
+  <div id="plot-canvas">
+    <canvas id="canvas" width="600" height="600"></canvas>
+  </div>
+</div>
+
+<script>
+  async function runCode() {
+    // Get text from CodeMirror instead of textarea
+    const code = window.editor.state.doc.toString();
+    const output = document.getElementById('output');
+    const canvas = document.getElementById('canvas');
+    
+    await window.webR.evalRVoid(`canvas(width=600, height=600)`);
+    
+    try {
+      const result = await window.webR.evalR(code);
+      const outputText = await result.toJs();
+      output.innerText += `\n> Running snippet...\n${outputText.values || ''}`;
+    } catch (err) {
+      output.innerText += `\nError: ${err.message}`;
+    } finally {
+      const imgs = await window.webR.evalR("dev.capture()");
+      const imgData = await imgs.toJs();
+      if (imgData.value && imgData.value.length > 0) {
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.src = imgData.value[imgData.value.length - 1]; // Get latest plot
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+        };
+      }
+      await window.webR.evalRVoid("dev.off()");
+    }
+    output.scrollTop = output.scrollHeight;
+  }
+
+  function clearAll() {
+    // Clear CodeMirror content
+    const transaction = window.editor.state.update({
+      changes: {from: 0, to: window.editor.state.doc.length, insert: "# Insert your code here\n"}
+    });
+    window.editor.dispatch(transaction);
+    
+    document.getElementById('output').innerText = "Console cleared.";
+    const canvas = document.getElementById('canvas');
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  }
+</script>
 </body>
 </html>
