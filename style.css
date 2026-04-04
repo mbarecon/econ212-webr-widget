@@ -1,0 +1,8 @@
+body { margin: 0; font-family: sans-serif; background: #282c34; color: white; }
+.toolbar { padding: 10px; background: #21252b; border-bottom: 1px solid #3e4451; }
+.main-layout { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 50px); }
+#editor-container { border-right: 1px solid #3e4451; overflow: auto; }
+.output-area { padding: 20px; overflow-y: auto; background: #1e2127; }
+#console-output { color: #abb2bf; white-space: pre-wrap; }
+canvas { max-width: 100%; height: auto; margin-top: 10px; border: 1px solid #3e4451; }
+button { margin-left: 10px; cursor: pointer; }
