@@ -1,14 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>My WebR Interface</title>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-        iframe { width: 100%; height: 100vh; border: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R Web Console</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://oi-j.github.io/coi-serviceworker/coi-serviceworker.min.js"></script>
 </head>
 <body>
-    <iframe src="https://webr.r-wasm.org/latest/"></iframe>
+  <div class="app-container">
+    <div class="toolbar">
+      <span id="status">Initializing R...</span>
+      <button id="run-btn" disabled>Run Code</button>
+      <button id="clear-btn">Clear All</button>
+    </div>
+    <div class="main-layout">
+      <div id="editor-container"></div>
+      <div class="output-area">
+        <pre id="console-output"></pre>
+        <div id="plot-output"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
